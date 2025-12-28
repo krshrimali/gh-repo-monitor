@@ -62,16 +62,18 @@ print_info "New repositories will be created as: $VISIBILITY"
 print_info "Press Ctrl+C to stop monitoring"
 echo ""
 
+# Create a temporary file to store processed directories
+PROCESSED_DIRS=$(mktemp)
+trap "rm -f $PROCESSED_DIRS" EXIT
+
 # Store existing directories
-declare -A existing_dirs
-while IFS= read -r -d '' dir; do
-    existing_dirs["$dir"]=1
-done < <(find "$WATCH_DIR" -mindepth 1 -maxdepth 1 -type d -print0)
+find "$WATCH_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
+    echo "$dir" >> "$PROCESSED_DIRS"
+done
 
 # Monitor for changes
-fswatch -0 -r --event Created --event-flags "$WATCH_DIR" | while read -d "" event; do
-    # Extract the path and flags
-    EVENT_PATH=$(echo "$event" | cut -f1)
+fswatch -0 --event Created "$WATCH_DIR" | while read -d "" EVENT_PATH; do
+    # fswatch with -0 outputs null-terminated paths
 
     # Check if it's a new directory in the watched folder (not subdirectories)
     if [ -d "$EVENT_PATH" ]; then
@@ -81,8 +83,8 @@ fswatch -0 -r --event Created --event-flags "$WATCH_DIR" | while read -d "" even
         # Only process if it's a direct child of WATCH_DIR
         if [ "$PARENT_DIR" = "$WATCH_DIR" ]; then
             # Check if we've already processed this directory
-            if [ -z "${existing_dirs[$EVENT_PATH]}" ]; then
-                existing_dirs["$EVENT_PATH"]=1
+            if ! grep -Fxq "$EVENT_PATH" "$PROCESSED_DIRS"; then
+                echo "$EVENT_PATH" >> "$PROCESSED_DIRS"
 
                 FOLDER_NAME=$(basename "$EVENT_PATH")
                 print_info "New folder detected: $FOLDER_NAME"
