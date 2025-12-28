@@ -1,5 +1,7 @@
 # Auto GitHub Repository Manager
 
+Made with Claude-Code
+
 Automatically create GitHub repositories when you create new folders, and easily sync them with simple commands.
 
 ## Features
